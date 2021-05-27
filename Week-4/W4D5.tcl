@@ -1,0 +1,182 @@
+
+###################################
+# Initialization
+###################################
+
+# an object of Simulator
+set ns [new Simulator]
+
+# Start of Simulation
+puts "Starting of Simulation at [$ns now]"
+
+# flow Coloring  
+$ns color 1 darkviolet
+$ns color 2 dodgerblue
+
+# textual trace file
+set tracefile [open out5.tr w]
+$ns trace-all $tracefile
+
+# nam trace file
+set namfile [open out5.nam w]
+$ns namtrace-all $namfile
+
+
+###################################
+# network configuration
+###################################
+
+# node definition
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+set n4 [$ns node]
+set n5 [$ns node]
+
+# Node shaping !Shape can not be changed during simulation!
+#$n0 shape box
+#$n1 shape hexagon
+
+# Node Coloring  
+$n0 color darkviolet
+$n1 color dodgerblue
+$n2 color orange
+$n3 color green
+$n4 color darkviolet
+$n5 color dodgerblue
+
+# Node labeling
+$n0 label “TCP_Src”
+$n1 label “UDP_Src”
+$n4 label “TCP_Sink”
+$n5 label “Null”
+
+# Node lable coloring
+#$n0 label-color darkviolet
+#$n1 label-color darkviolet
+
+# Node marking
+#$n0 add-mark m0 blue circle
+#$n1 add-mark m1 blue circle
+
+#mark removing
+#$ns at 50 "$n0 delete-mark m0"
+#$ns at 50 "$n1 delete-mark m1"
+
+# link definition
+$ns duplex-link $n0 $n2 2Mb 10ms DropTail
+$ns duplex-link $n1 $n2 2Mb 10ms DropTail
+$ns duplex-link $n2 $n3 0.3Mb 100ms DropTail
+$ns duplex-link $n3 $n4 0.5Mb 40ms DropTail
+$ns duplex-link $n3 $n5 0.5Mb 40ms DropTail
+
+#Set Queue Size of link (n2-n3) to 20
+$ns queue-limit $n2 $n3 20
+
+# Link labeling
+$ns duplex-link-op $n0 $n2 label "DropTail_5Mb_10ms"
+$ns duplex-link-op $n1 $n2 label "DropTail_5Mb_10ms"
+$ns duplex-link-op $n2 $n3 label "DropTail_0.3Mb_10ms"
+$ns duplex-link-op $n3 $n4 label "DropTail_5Mb_10ms"
+$ns duplex-link-op $n3 $n5 label "DropTail_5Mb_10ms"
+
+# Link Coloring  
+#$ns duplex-link-op $n0 $n1 color red
+
+# link Orientation
+$ns duplex-link-op $n0 $n2 orient right-down
+$ns duplex-link-op $n1 $n2 orient right-up
+$ns duplex-link-op $n2 $n3 orient right
+$ns duplex-link-op $n3 $n4 orient right-up
+$ns duplex-link-op $n3 $n5 orient right-down
+
+# queue positioning
+#$ns duplex-link-op $n0 $n1 queuePos 5
+
+
+# get node IDs
+#set nodeID0 [$n0 id]
+#set nodeID1 [$n1 id]
+#puts "nodes $nodeID0 and $nodeID1 created!"
+
+
+###################################
+# Agent and Application Assignment
+###################################
+
+#setup a TCP connection
+set tcp [new Agent/TCP]
+$ns attach-agent $n0 $tcp
+set sink [new Agent/TCPSink]
+$ns attach-agent $n4 $sink
+$ns connect $tcp $sink
+$tcp set fid_ 1
+$tcp set packetSize_  552
+
+#Setup a FTP over TCP connection
+set ftp [new Application/FTP]
+$ftp attach-agent $tcp
+
+
+#setup a UDP connection
+set udp [new Agent/UDP]
+$ns attach-agent $n1 $udp
+set null [new Agent/Null]
+$ns attach-agent $n5 $null
+$ns connect $udp $null
+$udp set fid_ 2
+
+#setup a CBR over UDP connEction
+set cbr [new Application/Traffic/CBR]
+$cbr attach-agent $udp
+$cbr set packetSize_ 1000
+$cbr set rate_ 0.35Mb
+$cbr set random_ false
+
+
+###################################
+# Scheduling
+###################################
+
+# Scheduling the events
+$ns at 5.0 "$ftp start"
+$ns at 50.0 "$ftp stop"
+
+$ns at 50.0 "$cbr start"
+$ns at 95.0 "$cbr stop"
+
+$ns at 100.0 "finish"
+
+# NAM Annotation
+$ns at 0.0 "$ns trace-annotate \"Start Simulation\""
+
+$ns at 5.0 "$ns trace-annotate \"Start FTP Traffic from N0 to N4\""
+$ns at 50.0 "$ns trace-annotate \"Stop FTP Traffic from N0 to N4\""
+
+$ns at 50.0 "$ns trace-annotate \"Start CBR Traffic from N1 to N5\""
+$ns at 95.0 "$ns trace-annotate \"Stop CBR Traffic from N1 to N5\""
+
+$ns at 99.9 "$ns trace-annotate \"Stop Simulation\""
+
+###################################
+# Procedures
+###################################
+
+# finish procedure
+proc finish {} {
+	global ns tracefile namfile
+	$ns flush-trace
+	close $tracefile
+	close $namfile
+	puts "Ending the Simulation at [$ns now]"
+	exec nam out5.nam &
+	exit 0
+}
+
+###################################
+# Running
+###################################
+
+$ns run
+
